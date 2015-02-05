@@ -1,17 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# TODO:
+# - scaling of freq distributions
+
 import os
 import sys
 import math
 import json
 import struct
 import numpy as np
-
-from common import (DataPreset, 
-                    write_preset_to_file, 
-                    write_freq_modul_data_to_file, 
-                    write_k_modul_data_to_file)
+from common import DataPreset, write_preset_to_file
 
 # Available presets:
 # * simple_freq
@@ -171,7 +170,7 @@ def get_preset(config, g_dtype=np.float64):
                 y = (layer_index+1) * N_osc_per_layer + osc_index
                 k[x, y] = 1.0
                 k[y, x] = 1.0
-        # print k
+        #print k
     elif connectivity == 'layered_2':
         N_layers = 2
         N_osc_per_layer = int(N / N_layers)
@@ -184,7 +183,7 @@ def get_preset(config, g_dtype=np.float64):
                     y = (layer_index+1) * N_osc_per_layer + osc_index
                     k[x, y] = 1.0
                     k[y, x] = 1.0
-        #print k
+        print k
 
     for i in xrange(N): # zeros on the diagonal
         k[i,i] = 0.0
@@ -197,7 +196,7 @@ def get_preset(config, g_dtype=np.float64):
     freq_dist_location = config.setdefault('freq_dist_location', 0.0)
 
     if freq_dist == 'lorentz':
-        # Cauchy–Lorentz distribution as used by Kuramoto and Daido
+        # Cauchyâ€“Lorentz distribution as used by Kuramoto and Daido
         omega = np.random.standard_cauchy(size=N).astype(g_dtype)
         omega *= freq_dist_scale * 0.9
         omega += freq_dist_location
@@ -208,9 +207,6 @@ def get_preset(config, g_dtype=np.float64):
                                   high=1.1*freq_dist_scale,
                                   size=N).astype(g_dtype)
         omega += freq_dist_location
-        
-    #############################
-    omega = float(0.5) * np.ones(N, dtype=g_dtype)
 
     # NOTE: apply this only to symmetric distributions
     if bool(config.setdefault('freq_dist_no_unary', False)):
@@ -222,49 +218,7 @@ def get_preset(config, g_dtype=np.float64):
 
     phase = np.random.uniform(low=0.0, high=2.0*math.pi, size=N).astype(g_dtype)
 
-    freq_ampl = freq_freq = freq_offset = k_ampl = k_freq = k_offset = None
-
-    if config.setdefault('freq_modulation_enabled', False):
-        freq_ampl = config.setdefault('freq_ampl', 0.0)
-        freq_freq = config.setdefault('freq_freq', 0.0)
-        freq_offset = config.setdefault('freq_offset', 0.0)
-
-        if freq_ampl == 'random':
-            freq_ampl = np.random.uniform(low=0.0, high=1.0, size=N).astype(g_dtype)
-        else:
-            freq_ampl = float(freq_ampl) * np.ones(N, dtype=g_dtype)
-
-        if freq_freq == 'random':
-            freq_freq = np.random.uniform(low=0.0, high=1.0, size=N).astype(g_dtype)
-        else:
-            freq_freq = float(freq_freq) * np.ones(N, dtype=g_dtype)
-
-        if freq_offset == 'random':
-            freq_offset = np.random.uniform(low=0.0, high=2.0*math.pi, size=N).astype(g_dtype)
-        else:
-            freq_offset = float(freq_offset) * np.ones(N, dtype=g_dtype)
-
-    if config.setdefault('k_modulation_enabled', False):
-        k_ampl = config.setdefault('k_ampl', 0.0)
-        k_freq = config.setdefault('k_freq', 0.0)
-        k_offset = config.setdefault('k_offset', 0.0)
-
-        if k_ampl == 'random':
-            k_ampl = np.random.uniform(low=0.0, high=1.0, size=N).astype(g_dtype)
-        else:
-            k_ampl = float(k_ampl) * np.ones(N, dtype=g_dtype)
-
-        if k_freq == 'random':
-            k_freq = np.random.uniform(low=0.0, high=1.0, size=(N,N)).astype(g_dtype)
-        else:
-            k_freq = float(k_freq) * np.ones((N,N), dtype=g_dtype)
-
-        if k_offset == 'random':
-            k_offset = np.random.uniform(low=0.0, high=2.0*math.pi, size=(N,N)).astype(g_dtype)
-        else:
-            k_offset = float(k_offset) * np.ones((N,N), dtype=g_dtype)
-
-    return (DataPreset(N, k, omega, phase), (freq_ampl, freq_freq, freq_offset), (k_ampl, k_freq, k_offset))
+    return DataPreset(N, k, omega, phase)
 
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
@@ -280,40 +234,23 @@ if __name__ == '__main__':
             config = json.load(f)
         if len(sys.argv) >= 3:
             config['K'] = float(sys.argv[2])
-        # print config
-        preset_data = get_preset(config)
-        preset = preset_data[0]
+        preset = get_preset(config)
 
+    preset_out_file_name = preset_name + '.preset'
     try:
-        os.remove(preset_name + '.preset')
+        os.remove(preset_out_file_name)
     except Exception:
         pass
-    try:
-        os.remove(preset_name + '.fm.preset')
-    except Exception:
-        pass
-    try:
-        os.remove(preset_name + '.km.preset')
-    except Exception:
-        pass
-
-    if config['freq_modulation_enabled']:
-        #print 'freq_modulation_enabled'
-        #print preset_data[1]
-        write_freq_modul_data_to_file(preset_name, *preset_data[1])
-    if config['k_modulation_enabled']:
-        #print 'k_modulation_enabled'
-        write_k_modul_data_to_file(preset_name, *preset_data[2])
 
     #print preset.k
     #print preset.freq
     #print preset.phase
     write_preset_to_file(preset_name, preset)
-
+    
     if len(sys.argv) < 3:
         import matplotlib.pyplot as plt
-        from common import save_plot
-
+        from common import save_plot    
+    
         plt.ylabel('Phase histogram')
         range = (0, 2.0 * math.pi)
         plt.hist(preset.phase, bins=50, range=range)
