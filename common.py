@@ -103,3 +103,4 @@ def save_plot(path, ext='png', close=True):
     plt.savefig(savepath)
     if close:
         plt.close()
+

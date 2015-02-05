@@ -1,6 +1,6 @@
 /***********************************************************************
  *                      Kuramoto oscillators                           *
- *               Copyright (c) 2014 Alex Khrabrov                      *
+ *             Copyright (c) 2014-2015 Alex Khrabrov                   *
  ***********************************************************************
  * This program is free software. It comes without any warranty, to    *
  * the extent permitted by applicable law. You can redistribute it     *
@@ -41,11 +41,11 @@ static const fp_type TWO_PI = 2.0 * M_PI;
 #include <algorithm>
 #include <numeric>
 
-#include <filesystem>
-
 #include <cassert>
 #include <cstdint>
 #include <cstdlib>
+
+#include <boost/filesystem.hpp>
 
 #if defined(WIN32) || defined(_WIN32)
 #define PATH_SEPARATOR "\\"
@@ -55,7 +55,7 @@ static const fp_type TWO_PI = 2.0 * M_PI;
 
 #ifdef _MSC_VER
 #define FORCE_INLINE __forceinline
-#elif
+#else
 #define FORCE_INLINE inline
 #endif
 
@@ -536,17 +536,13 @@ int main(int argc, char * argv[])
     if (dump_interval > 0)
     {
         out_dir_name = "dump_" + preset_name + PATH_SEPARATOR + "steps" + PATH_SEPARATOR;
-        const tr2::sys::path out_path(out_dir_name);
-        if (!tr2::sys::exists(out_path))
-            tr2::sys::create_directories(out_path);
+        boost::filesystem::create_directories(out_dir_name);
     }
 
     if (!r_file_path.empty())
     {
-        const tr2::sys::path path(r_file_path);
-        const tr2::sys::path dir(path.parent_path());
-        if (!tr2::sys::exists(dir))
-            tr2::sys::create_directories(dir);
+        const boost::filesystem::path path(r_file_path);
+        boost::filesystem::create_directories(path.parent_path());
     }
 
 #define RUN_SIMUL(copuling)              \
@@ -609,3 +605,4 @@ int main(int argc, char * argv[])
 
     return EXIT_SUCCESS;
 }
+
