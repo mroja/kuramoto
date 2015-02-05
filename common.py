@@ -23,7 +23,13 @@ class SimulationConfig(object):
         self.forcing_strength = 0.0
         self.forcing_freq = 0.0
         self.freq_modulation_enabled = False
+        self.freq_modulation_ampl = 0.0
+        self.freq_modulation_freq = 0.0
+        self.freq_modulation_offset = 0.0
         self.k_modulation_enabled = False
+        self.k_modulation_ampl = 0.0
+        self.k_modulation_freq = 0.0
+        self.k_modulation_offset = 0.0
 
     def write_to_file(self, preset_name):
         conf_str = \
@@ -35,7 +41,13 @@ class SimulationConfig(object):
             '{forcing_strength:f}\n' + \
             '{forcing_freq:f}\n' + \
             '{freq_modulation_enabled}\n' + \
-            '{k_modulation_enabled}'
+            '{freq_modulation_ampl:f}\n' + \
+            '{freq_modulation_freq:f}\n' + \
+            '{freq_modulation_offset:f}\n' + \
+            '{k_modulation_enabled}\n' + \
+            '{k_modulation_ampl:f}\n' + \
+            '{k_modulation_freq:f}\n' + \
+            '{k_modulation_offset:f}'
         args = {
            'N_steps':                 self.N_steps,
            'dt':                      self.dt,
@@ -45,12 +57,18 @@ class SimulationConfig(object):
            'forcing_strength':        self.forcing_strength,
            'forcing_freq':            self.forcing_freq,
            'freq_modulation_enabled': 'freq_modulation' if self.freq_modulation_enabled else 'no_freq_modulation',
+           'freq_modulation_ampl':    self.freq_modulation_ampl,
+           'freq_modulation_freq':    self.freq_modulation_freq,
+           'freq_modulation_offset':  self.freq_modulation_offset,
            'k_modulation_enabled':    'k_modulation' if self.k_modulation_enabled else 'no_k_modulation',
+           'k_modulation_ampl':       self.k_modulation_ampl,
+           'k_modulation_freq':       self.k_modulation_freq,
+           'k_modulation_offset':     self.k_modulation_offset
         }
         conf = conf_str.format(**args)
         with open(preset_name + '.conf.txt', 'w') as f:
             f.write(conf)
-
+            
     def read_from_file(self, preset_name):
         with open(preset_name + '.conf.txt', 'r') as f:
             lines = f.readlines()
@@ -62,10 +80,16 @@ class SimulationConfig(object):
             self.forcing_strength = float(lines[5])
             self.forcing_freq = float(lines[6])
             self.freq_modulation_enabled = True if lines[7] == 'freq_modulation' else False
+            self.freq_modulation_ampl = float(lines[8])
+            self.freq_modulation_freq = float(lines[9])
+            self.freq_modulation_offset = float(lines[10])
             self.k_modulation_enabled = True if lines[11] == 'k_modulation' else False
+            self.k_modulation_ampl = float(lines[12])
+            self.k_modulation_freq = float(lines[13])
+            self.k_modulation_offset = float(lines[14])
 
 def load_preset_from_file(name):
-    with open(name + '.preset', 'rb') as f:
+    with open(name + '.bin', 'rb') as f:
         N = struct.unpack('I', f.read(4))[0]
         freq = np.fromfile(f, dtype=np.float64, count=N)
         phase = np.fromfile(f, dtype=np.float64, count=N)
@@ -73,23 +97,11 @@ def load_preset_from_file(name):
     return DataPreset(N, k, freq, phase)
 
 def write_preset_to_file(file_name, preset):
-    with open(file_name + '.preset', 'wb') as f:
+    with open(file_name, 'wb') as f:
         f.write(struct.pack('I', preset.N))
         preset.freq.astype(np.float64).tofile(f)
         preset.phase.astype(np.float64).tofile(f)
         preset.k.astype(np.float64).tofile(f)
-
-def write_freq_modul_data_to_file(file_name, freq_ampl, freq_freq, freq_offset):
-    with open(file_name + '.fm.preset', 'wb') as f:
-        freq_ampl.astype(np.float64).tofile(f)
-        freq_freq.astype(np.float64).tofile(f)
-        freq_offset.astype(np.float64).tofile(f)
-
-def write_k_modul_data_to_file(file_name, k_ampl, k_freq, k_offset):
-    with open(file_name + '.km.preset', 'wb') as f:
-        k_ampl.astype(np.float64).tofile(f)
-        k_freq.astype(np.float64).tofile(f)
-        k_offset.astype(np.float64).tofile(f)
 
 def save_plot(path, ext='png', close=True):
     directory = os.path.split(path)[0]
@@ -103,4 +115,3 @@ def save_plot(path, ext='png', close=True):
     plt.savefig(savepath)
     if close:
         plt.close()
-
