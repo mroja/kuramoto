@@ -67,7 +67,7 @@ FORCE_INLINE T mean(const std::vector<T> & v)
     const auto size = v.size();
     assert(size != 0);
     T sum(0);
-	for(std::vector<T>::size_type i = 0; i < size; i++)
+    for(typename std::vector<T>::size_type i = 0; i < size; i++)
         sum += v[i];
     return sum / T(size);
 }
@@ -82,7 +82,7 @@ T calc_order_parameter(const std::vector<T> & phases)
     const auto size = phases.size();
     tmp_s.resize(size);
     tmp_c.resize(size);
-	for(std::vector<T>::size_type i = 0; i < size; i++)
+    for(typename std::vector<T>::size_type i = 0; i < size; i++)
     {
         const T p = phases[i];
         tmp_s[i] = sin(p);
