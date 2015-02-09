@@ -246,8 +246,8 @@ void run_simulation
     using namespace std;
 
     assert(N > 0 && dt > 0 && phase.size() == N && freq.size() == N && k.size() == N*N);
-    assert(freq_modulation_enabled && freq_ampl.size() == N && freq_freq.size() == N && freq_offset.size() == N);
-    assert(k_modulation_enabled && k_ampl.size() == N && k_freq.size() == N*N && k_offset.size() == N*N);
+    assert(freq_modulation_enabled ? (freq_ampl.size() == N && freq_freq.size() == N && freq_offset.size() == N) : true);
+    assert(k_modulation_enabled ? (k_ampl.size() == N && k_freq.size() == N*N && k_offset.size() == N*N) : true);
 
     const T two_dt = T(2.0) * dt;
 
@@ -423,6 +423,7 @@ void read_k_modulation_data(std::ifstream & input,
 int main(int argc, char * argv[])
 {
     using namespace std;
+
     ios_base::sync_with_stdio(false);
 
     if(argc <= 1)
@@ -444,25 +445,26 @@ int main(int argc, char * argv[])
     string freq_modulation_enabled_s;
     string k_modulation_enabled_s;
 
-    ifstream cfg_input(preset_name + ".conf.txt");
-    if(!cfg_input)
+    // read .conf.txt
     {
-        cerr << "Unable to open config file: " << preset_name << ".conf.txt" << endl;
-        return EXIT_FAILURE;
+        ifstream cfg_input(preset_name + ".conf.txt");
+        if(!cfg_input)
+        {
+            cerr << "Unable to open config file: " << preset_name << ".conf.txt" << endl;
+            return EXIT_FAILURE;
+        }
+        cfg_input.exceptions(ifstream::failbit | ifstream::badbit);
+
+        cfg_input >> N_steps;
+        cfg_input >> dt;
+        cfg_input >> noise;
+        cfg_input >> dump_interval;
+        cfg_input >> coupling_type;
+        cfg_input >> forcing_strength;
+        cfg_input >> forcing_freq;
+        cfg_input >> freq_modulation_enabled_s;
+        cfg_input >> k_modulation_enabled_s;
     }
-    cfg_input.exceptions(ifstream::failbit | ifstream::badbit);
-
-    cfg_input >> N_steps;
-    cfg_input >> dt;
-    cfg_input >> noise;
-    cfg_input >> dump_interval;
-    cfg_input >> coupling_type;
-    cfg_input >> forcing_strength;
-    cfg_input >> forcing_freq;
-    cfg_input >> freq_modulation_enabled_s;
-    cfg_input >> k_modulation_enabled_s;
-
-    cfg_input.close();
 
     const bool freq_modulation_enabled = (freq_modulation_enabled_s == "freq_modulation");
     const bool k_modulation_enabled = (k_modulation_enabled_s == "k_modulation");
@@ -472,6 +474,21 @@ int main(int argc, char * argv[])
     vector<fp_type> phase;
     vector<fp_type> k;
 
+    // read preset data
+    {
+        ifstream input(preset_name + ".preset", ifstream::in | ifstream::binary);
+
+        if(!input)
+        {
+            cerr << "Unable to open input file: " << preset_name << ".preset" << endl;
+            return EXIT_FAILURE;
+        }
+
+        input.exceptions(ifstream::failbit | ifstream::badbit);
+
+        read_preset(input, N, freq, phase, k);
+    }
+
     vector<fp_type> freq_ampl;
     vector<fp_type> freq_freq;
     vector<fp_type> freq_offset;
@@ -480,18 +497,9 @@ int main(int argc, char * argv[])
     vector<fp_type> k_freq;
     vector<fp_type> k_offset;
 
-    ifstream input(preset_name + ".preset", ifstream::in | ifstream::binary);
-    if(!input)
-    {
-        cerr << "Unable to open input file: " << preset_name << ".preset" << endl;
-        return EXIT_FAILURE;
-    }
-    input.exceptions(ifstream::failbit | ifstream::badbit);
-    read_preset(input, N, freq, phase, k);
-    input.close();
-
     if(freq_modulation_enabled)
     {
+        cout << "freq_modulation_enabled" << endl;
         ifstream input_s(preset_name + ".fm.preset", ifstream::in | ifstream::binary);
         if (!input_s)
         {
@@ -504,6 +512,7 @@ int main(int argc, char * argv[])
 
     if(k_modulation_enabled)
     {
+        cout << "k_modulation_enabled" << endl;
         ifstream input_s(preset_name + ".km.preset", ifstream::in | ifstream::binary);
         if (!input_s)
         {
@@ -514,13 +523,13 @@ int main(int argc, char * argv[])
         read_k_modulation_data(input_s, N, k_ampl, k_freq, k_offset);
     }
 
-    cout << "Data loaded." << endl;
+    std::cout << "Data loaded." << std::endl;
 
     bool r_history_enabled = true;
     bool mean_history_enabled = true;
     bool mean_vel_history_enabled = true;
 
-    string r_file_path;
+    string r_file_path = "r.txt";
     string out_dir_name;
 
     if (argc >= 3 && string(argv[2]) == "--only-r")
@@ -536,13 +545,16 @@ int main(int argc, char * argv[])
     if (dump_interval > 0)
     {
         out_dir_name = "dump_" + preset_name + PATH_SEPARATOR + "steps" + PATH_SEPARATOR;
+        // std::cout << "Creating steps dir: " << out_dir_name << std::endl;
         boost::filesystem::create_directories(out_dir_name);
     }
 
     if (!r_file_path.empty())
     {
-        const boost::filesystem::path path(r_file_path);
-        boost::filesystem::create_directories(path.parent_path());
+        const string path_str = boost::filesystem::path(r_file_path).parent_path().string();
+        // std::cout << "Creating r-file dir: " << path_str << std::endl;
+        if(path_str != "")
+            boost::filesystem::create_directories(path_str);
     }
 
 #define RUN_SIMUL(copuling)              \
@@ -599,10 +611,9 @@ int main(int argc, char * argv[])
         RUN_SIMUL(coupling_4);
     else
     {
-        cerr << "Unknown coupling type: " << coupling_type << endl;
+        std::cerr << "Unknown coupling type: " << coupling_type << std::endl;
         return EXIT_FAILURE;
     }
 
     return EXIT_SUCCESS;
 }
-

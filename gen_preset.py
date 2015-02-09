@@ -96,9 +96,11 @@ def get_simple_preset(preset, g_dtype=np.float64):
 def get_preset(config, g_dtype=np.float64):
     if 'N' not in config:
         raise Exception('get_preset: number of oscillators not specified')
+
     N = int(config['N'])
 
     k = np.zeros((N,N), dtype=g_dtype)
+
     connectivity = config.setdefault('connectivity', 'all_to_all')
     if connectivity == 'all_to_all':
         k += 1.0
@@ -186,7 +188,7 @@ def get_preset(config, g_dtype=np.float64):
         print k
 
     for i in xrange(N): # zeros on the diagonal
-        k[i,i] = 0.0
+        k[i, i] = 0.0
 
     k *= float(config.setdefault('K', 1.0)) # apply final K value
     k /= float(N) # divide by N here, simulation doesn't do this
