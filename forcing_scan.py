@@ -27,7 +27,7 @@ get_preset_config = {
     #"freq_dist": "lorentz",
     #"freq_dist": "normal",
     "freq_dist": "uniform",
-    "freq_dist_no_unary": false,
+    "freq_dist_no_unary": False,
     "freq_dist_scale": 10,
     "freq_dist_location": 0.0
 }
@@ -54,5 +54,5 @@ for fs in xrange(0, 20, 4):
         config.forcing_freq = ff #30.0
         config.write_to_file(name)
         os.system('python gen_preset.py ' + name)
-        os.system('kuramoto_simulation.exe ' + name + ' --only-r -r r.txt')
-        os.system('python gen_plots.py ' + name)
+        os.system('kuramoto_simulation ' + name + ' --only-r -r r.txt')
+        #os.system('python gen_plots.py ' + name)
