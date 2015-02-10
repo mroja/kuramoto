@@ -4,6 +4,7 @@
 import os
 import sys
 import json
+import shutil
 import multiprocessing
 
 from common import KuramotoSimulation, write_preset_to_file
@@ -102,7 +103,7 @@ if __name__ == '__main__':
         plot_crit_k(preset_name, K_values, r_mean, save=False)
         sys.exit()
     else:
-        preset_config['K'] = 14.5
+        preset_config['K'] = 13.5
 
     forcing_presets = []
     for forcing_strength in range(0, 20, 4):
@@ -132,3 +133,16 @@ if __name__ == '__main__':
             preset_name = 'forcing_{}_{}'.format(forcing_frequency, forcing_strength)
             
             os.system('nice python3 gen_plots.py ' + preset_name)
+
+    # copy files in one place
+    if 1:
+        for forcing_frequency, forcing_strength in forcing_presets:
+            input_dir = 'dump_forcing_{}_{}'.format(forcing_frequency, forcing_strength)
+            f_name = '{}_{}'.format(forcing_frequency, forcing_strength)
+            dest_dir = 'forcing_out'
+
+            shutil.copy2(os.path.join(input_dir, 'hist.avi'), os.path.join(dest_dir, f_name + '_hist.avi'))
+            shutil.copy2(os.path.join(input_dir, 'phase.avi'), os.path.join(dest_dir,  f_name + '_phase.avi'))
+            shutil.copy2(os.path.join(input_dir, 'r.png'), os.path.join(dest_dir,  f_name + '_r.png'))
+            shutil.copy2(os.path.join(input_dir, 'mean.png'), os.path.join(dest_dir,  f_name + '_mean.png'))
+            shutil.copy2(os.path.join(input_dir, 'mean_vel.png'), os.path.join(dest_dir,  f_name + '_mean_vel.png'))
