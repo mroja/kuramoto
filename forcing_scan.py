@@ -103,7 +103,7 @@ if __name__ == '__main__':
         plot_crit_k(preset_name, K_values, r_mean, save=False)
         sys.exit()
     else:
-        preset_config['K'] = 13.5
+        preset_config['K'] = 11.5
 
     forcing_presets = []
     for forcing_strength in range(0, 20, 4):
@@ -138,8 +138,12 @@ if __name__ == '__main__':
     if 1:
         for forcing_frequency, forcing_strength in forcing_presets:
             input_dir = 'dump_forcing_{}_{}'.format(forcing_frequency, forcing_strength)
+            
             f_name = '{}_{}'.format(forcing_frequency, forcing_strength)
+            
             dest_dir = 'forcing_out'
+            if not os.path.exists(dest_dir):
+                os.makedirs(dest_dir)
 
             shutil.copy2(os.path.join(input_dir, 'hist.avi'), os.path.join(dest_dir, f_name + '_hist.avi'))
             shutil.copy2(os.path.join(input_dir, 'phase.avi'), os.path.join(dest_dir,  f_name + '_phase.avi'))
