@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 2.8)
 project(kuramoto_simulation)
 
 if(CMAKE_COMPILER_IS_GNUCC)
-    # TODO: try -mfpmath=sse
     add_definitions(-std=c++11 -march=native -Ofast -fomit-frame-pointer)
 endif(CMAKE_COMPILER_IS_GNUCC)
 
@@ -16,3 +15,4 @@ find_package(Boost COMPONENTS thread filesystem system program_options REQUIRED)
 
 add_executable(kuramoto_simulation kuramoto_simulation.cpp)
 target_link_libraries(kuramoto_simulation ${Boost_LIBRARIES})
+

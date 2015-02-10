@@ -27,8 +27,9 @@ class KuramotoSimulation(object):
         self.freq_modulation_enabled = False
         self.k_modulation_enabled = False
 
-    def run(self, preset_name, r_only=False, r_file='r.txt'):
+    def run(self, preset_name, r_file=None, mean_file=None, mean_vel_file=None):
         cmd = ['kuramoto_simulation',
+               '--quiet',
                '--preset', preset_name,
                '--steps', str(self.N_steps),
                '--dump-interval', str(self.dump_interval),
@@ -38,10 +39,20 @@ class KuramotoSimulation(object):
                '--forcing-strength', str(self.forcing_strength), 
                '--forcing-freq', str(self.forcing_freq)]
 
-        if r_only:
-            cmd.append('--only-r')
+        if r_file is not None:
             cmd.append('--r-file')
-            cmd.append(r_file)
+            if type(r_file) is str and r_file:
+                cmd.append(r_file)
+
+        if mean_file is not None:
+            cmd.append('--mean-phase-file')
+            if type(mean_file) is str and mean_file:
+                cmd.append(mean_file)
+
+        if mean_vel_file is not None:
+            cmd.append('--mean-vel-file')
+            if type(mean_vel_file) is str and mean_vel_file:
+                cmd.append(mean_vel_file)
 
         if self.k_modulation_enabled:
             cmd.append('--enable-k-modulation')

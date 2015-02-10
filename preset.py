@@ -107,18 +107,18 @@ def get_preset(config, g_dtype=np.float64):
     if connectivity == 'all_to_all':
         k += 1.0
     elif connectivity == 'linear_unidirectional':
-        for i in xrange(0, N-1):
+        for i in range(0, N-1):
             k[i, i+1] = 1.0
     elif connectivity == 'linear_bidirectional':
-        for i in xrange(0, N-1):
+        for i in range(0, N-1):
             k[i, i+1] = 1.0
             k[i+1, i] = 1.0
     elif connectivity == 'circular_unidirectional':
-        for i in xrange(0, N-1):
+        for i in range(0, N-1):
             k[i, i+1] = 1.0
         k[N-1, 0] = 1.0
     elif connectivity == 'circular_bidirectional':
-        for i in xrange(0, N-1):
+        for i in range(0, N-1):
             k[i, i+1] = 1.0
             k[i+1, i] = 1.0
         k[N-1, 0] = 1.0
@@ -127,9 +127,9 @@ def get_preset(config, g_dtype=np.float64):
         k += 1.0
         N_conn = N*N - N
         N_remove = int(round(N_conn*float(config.setdefault('conn_remove_coeff', 0.5))))
-        print 'Removing %i connections from %i' % (N_remove, N_conn)
+        print('Removing %i connections from %i' % (N_remove, N_conn))
         removed_pairs = set()
-        for i in xrange(N_remove):
+        for i in range(N_remove):
             while True:
                 x = np.random.randint(low=0, high=N, size=1)[0]
                 y = np.random.randint(low=0, high=N, size=1)[0]
@@ -143,9 +143,9 @@ def get_preset(config, g_dtype=np.float64):
         k += 1.0
         N_conn = (N*N - N) / 2
         N_remove = int(round(N_conn*float(config.setdefault('conn_remove_coeff', 0.5))))
-        print 'Removing %i connections from %i' % (N_remove, N_conn)
+        print('Removing %i connections from %i' % (N_remove, N_conn))
         removed_pairs = set()
-        for i in xrange(N_remove):
+        for i in range(N_remove):
             while True:
                 x = np.random.randint(low=0, high=N, size=1)[0]
                 y = np.random.randint(low=0, high=N, size=1)[0]
@@ -164,12 +164,12 @@ def get_preset(config, g_dtype=np.float64):
             raise Exception('N must be divisable by N_layers')
         # create interconnected clusters
         offset = 0
-        for i in xrange(N_layers):
+        for i in range(N_layers):
             k[offset:offset + N_osc_per_layer, offset:offset + N_osc_per_layer] = 1.0
             offset += N_osc_per_layer
         # connect clusters
-        for layer_index in xrange(N_layers-1):
-            for osc_index in xrange(N_osc_per_layer):
+        for layer_index in range(N_layers-1):
+            for osc_index in range(N_osc_per_layer):
                 x = layer_index * N_osc_per_layer + osc_index
                 y = (layer_index+1) * N_osc_per_layer + osc_index
                 k[x, y] = 1.0
@@ -180,16 +180,16 @@ def get_preset(config, g_dtype=np.float64):
         N_osc_per_layer = int(N / N_layers)
         if N_osc_per_layer * N_layers != N:
             raise Exception('N must be divisable by N_layers')
-        for layer_index in xrange(N_layers-1):
-            for layer_osc_index in xrange(N_osc_per_layer):
-                for osc_index in xrange(N_osc_per_layer):
+        for layer_index in range(N_layers-1):
+            for layer_osc_index in range(N_osc_per_layer):
+                for osc_index in range(N_osc_per_layer):
                     x = layer_index * N_osc_per_layer + layer_osc_index
                     y = (layer_index+1) * N_osc_per_layer + osc_index
                     k[x, y] = 1.0
                     k[y, x] = 1.0
-        print k
+        print(k)
 
-    for i in xrange(N): # zeros on the diagonal
+    for i in range(N): # zeros on the diagonal
         k[i, i] = 0.0
 
     k *= float(config.setdefault('K', 1.0)) # apply final K value
@@ -215,8 +215,8 @@ def get_preset(config, g_dtype=np.float64):
     # NOTE: apply this only to symmetric distributions
     if bool(config.setdefault('freq_dist_no_unary', False)):
         if freq_dist_location == 0.0:
-            print 'WARNING: probably applying freq_dist_no_unary to non-symmetric distribution'
-        for i in xrange(N):
+            print('WARNING: probably applying freq_dist_no_unary to non-symmetric distribution')
+        for i in range(N):
             if omega[i] < 0.0:
                 omega[i] = -omega[i]
 
@@ -237,11 +237,11 @@ def plot_preset(preset_name, preset, save=False, close=True):
 
     plt.subplot(2, 1, 2)
     plt.ylabel('Frequency histogram')
-    range = (np.percentile(preset.freq, 5), np.percentile(preset.freq, 95))
-    d = range[1] - range[0]
-    range = (range[0] - 0.15*d, range[1] + 0.15*d)
-    plt.xlim(range[0], range[1])
-    plt.hist(preset.freq, bins=50, range=range)
+    freq_range = (np.percentile(preset.freq, 5), np.percentile(preset.freq, 95))
+    d = freq_range[1] - freq_range[0]
+    freq_range = (freq_range[0] - 0.15*d, freq_range[1] + 0.15*d)
+    plt.xlim(freq_range[0], freq_range[1])
+    plt.hist(preset.freq, bins=50, range=freq_range)
 
     if save:
         save_plot(preset_name, close=False)
@@ -254,8 +254,8 @@ def plot_preset(preset_name, preset, save=False, close=True):
 
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        print "Usage: gen_preset.py preset_name|config_file [K]"
-        print "If K is supplied it will overwrite one specified in config_file."
+        print("Usage: gen_preset.py preset_name|config_file [K]")
+        print("If K is supplied it will overwrite one specified in config_file.")
         sys.exit()
 
     preset_name = sys.argv[1]
@@ -268,9 +268,9 @@ if __name__ == '__main__':
             config['K'] = float(sys.argv[2])
         preset = get_preset(config)
 
-    #print preset.k
-    #print preset.freq
-    #print preset.phase
+    #print(preset.k)
+    #print(preset.freq)
+    #print(preset.phase)
     
     write_preset_to_file(preset_name, preset)
 

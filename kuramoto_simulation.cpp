@@ -208,6 +208,8 @@ void dump_state
 template<typename T, T(*H)(T)>
 void run_simulation
 (
+    const bool quiet,                    // if true produce no output to console
+
     const unsigned int N,                // number of oscillators
     const unsigned int N_steps,          // simulations steps
 
@@ -240,8 +242,10 @@ void run_simulation
     const std::vector<T> k_freq,         // coupling coefficient modulation frequency
     const std::vector<T> k_offset,       // coupling coefficient modulation offset
 
-    const std::string & out_dir_name,    // MUST end with directory separator (/ or \)
-    const std::string & r_file_path      // if specified r history will be written to this file
+    const std::string & out_dir_name,      // MUST end with directory separator (/ or \)
+    const std::string & r_file_path,       // if specified r history will be written to this file
+    const std::string & mean_file_path,    // if specified mean phase will be written to this file
+    const std::string & mean_vel_file_path // if specified mean velocity will be written to this file
 )
 {
     using namespace std;
@@ -327,13 +331,15 @@ void run_simulation
             {
                 dump_counter = dump_interval;
                 const string out_file_name(out_dir_name + to_string(step) + ".txt");
-                cout << "Saving at step: " << step << endl;
+                if(!quiet)
+                    cout << "Saving at step: " << step << endl;
                 dump_state(out_file_name, phase, vel, step, N, r, mean_phase);
             }
             dump_counter--;
         }
         else if(!(step % 100))
-            cout << "Step: " << step << endl;
+            if(!quiet)
+                cout << "Step: " << step << endl;
 
         phase_old_old = phase_old;
         phase_old = phase;
@@ -341,28 +347,20 @@ void run_simulation
 
     if(r_history_enabled)
     {
-        if(!r_file_path.empty())
-        {
-            ofstream r_out(r_file_path, ofstream::trunc);
-            write_vector(r_out, r_hist);
-        }
-        else
-        {
-            ofstream r_out(out_dir_name + "r.txt", ofstream::trunc);
-            write_vector(r_out, r_hist);
-        }
+        ofstream r_out(r_file_path, ofstream::trunc);
+        write_vector(r_out, r_hist);
     }
 
     if(mean_history_enabled)
     {
-        ofstream mean_out(out_dir_name + "mean.txt", ofstream::trunc);
-        write_vector(mean_out, mean_hist);
+        ofstream mean_out(mean_file_path, ofstream::trunc);
+        write_vector(mean_out, mean_hist);            
     }
 
     if(mean_vel_history_enabled)
     {
-        ofstream mean_vel_out(out_dir_name + "mean_vel.txt", ofstream::trunc);
-        write_vector(mean_vel_out, mean_vel_hist);
+        ofstream mean_vel_out(mean_vel_file_path, ofstream::trunc);
+        write_vector(mean_vel_out, mean_vel_hist);            
     }
 }
 
@@ -433,18 +431,26 @@ int main(int argc, char * argv[])
         po::options_description desc("Options"); 
         desc.add_options() 
             ("help,h", "print help message")
+            ("quiet,q", "produce no output to console")
+            
             ("preset,p", po::value<std::string>()->required(), "preset name") 
             ("steps,s", po::value<unsigned int>()->default_value(1000), "simulation steps") 
             ("dump-interval,di", po::value<unsigned int>()->default_value(100), "data dump interval") 
             ("dt", po::value<double>()->default_value(0.01), "simulation time step")
+            
             ("noise", po::value<double>()->default_value(0.0), "noise level")
+            
             ("coupling,c", po::value<std::string>()->default_value("kuramoto"), "coupling type")
+            
             ("forcing-strength,fs", po::value<double>()->default_value(0.0), "forcing strength")
             ("forcing-freq,ff", po::value<double>()->default_value(0.0), "forcing frequency")
-            ("only-r", "generate only r file")
-            ("r-file,r", po::value<std::string>()->default_value("r.txt"), "r file path")
+            
             ("enable-k-modulation", "enable coupling coefficient modulation")
-            ("enable-freq-modulation", "enable frequency modulation");
+            ("enable-freq-modulation", "enable frequency modulation")
+            
+            ("r-file", po::value<std::string>()->implicit_value(""), "r file path")
+            ("mean-phase-file", po::value<std::string>()->implicit_value(""), "mean phase file path")
+            ("mean-vel-file", po::value<std::string>()->implicit_value(""), "mean velocity file path");
 
         po::variables_map vm; 
         
@@ -453,7 +459,7 @@ int main(int argc, char * argv[])
             po::store(po::parse_command_line(argc, argv, desc), vm);
             
             if(vm.count("help"))
-            { 
+            {
                 std::cout << std::endl 
                           << "kuramoto_simulation - versatile Kuramoto simulation program" << std::endl
                           << std::endl 
@@ -474,6 +480,8 @@ int main(int argc, char * argv[])
                       << "Hint: use -h option to display help." << std::endl; 
             return EXIT_FAILURE;
         }
+
+        const bool quiet = vm.count("quiet");
 
         const string preset_name = vm["preset"].as<std::string>();
         
@@ -520,7 +528,8 @@ int main(int argc, char * argv[])
 
         if(freq_modulation_enabled)
         {
-            cout << "freq_modulation_enabled" << endl;
+            if(!quiet)
+                cout << "freq_modulation_enabled" << endl;
             ifstream input_s(preset_name + ".fm.preset", ifstream::in | ifstream::binary);
             if (!input_s)
             {
@@ -533,7 +542,8 @@ int main(int argc, char * argv[])
 
         if(k_modulation_enabled)
         {
-            cout << "k_modulation_enabled" << endl;
+            if(!quiet)
+                cout << "k_modulation_enabled" << endl;
             ifstream input_s(preset_name + ".km.preset", ifstream::in | ifstream::binary);
             if (!input_s)
             {
@@ -544,40 +554,64 @@ int main(int argc, char * argv[])
             read_k_modulation_data(input_s, N, k_ampl, k_freq, k_offset);
         }
 
-        std::cout << "Data loaded." << std::endl;
+        if(!quiet)
+            std::cout << "Data loaded." << std::endl;
 
-        bool r_history_enabled = true;
-        bool mean_history_enabled = true;
-        bool mean_vel_history_enabled = true;
+        const bool r_history_enabled = vm.count("r-file");
+        const bool mean_history_enabled = vm.count("mean-phase-file");
+        const bool mean_vel_history_enabled = vm.count("mean-vel-file");
 
-        string r_file_path; // = "r.txt";
+        string r_file_path;
+        string mean_file_path;
+        string mean_vel_file_path;
+
         string out_dir_name;
-
-        if (vm.count("only-r"))
-        {
-            dump_interval = 0; // no dumps
-            mean_history_enabled = false;
-            mean_vel_history_enabled = false;
-            r_file_path = vm["r-file"].as<std::string>();
-        }
-
-        if (dump_interval > 0)
+        
+        // initialize dump directory
+        if(dump_interval > 0)
         {
             out_dir_name = "dump_" + preset_name + PATH_SEPARATOR + "steps" + PATH_SEPARATOR;
             // std::cout << "Creating steps dir: " << out_dir_name << std::endl;
             boost::filesystem::create_directories(out_dir_name);
         }
 
-        if (!r_file_path.empty())
+        if(r_history_enabled)
         {
+            r_file_path = vm["r-file"].as<std::string>();
+            if(r_file_path.empty())
+                r_file_path = out_dir_name + "r.txt";
             const string path_str = boost::filesystem::path(r_file_path).parent_path().string();
-            // std::cout << "Creating r-file dir: " << path_str << std::endl;
-            if(path_str != "")
+            if(!path_str.empty())
                 boost::filesystem::create_directories(path_str);
         }
 
-#define RUN_SIMUL(copuling)                  \
-        run_simulation<fp_type, copuling>(   \
+        if(mean_history_enabled)
+        {
+            mean_file_path = vm["mean-phase-file"].as<std::string>();
+            if(mean_file_path.empty())
+                mean_file_path = out_dir_name + "mean.txt";
+            const string path_str = boost::filesystem::path(mean_file_path).parent_path().string();
+            if(!path_str.empty())
+                boost::filesystem::create_directories(path_str);
+        }
+
+        if(mean_vel_history_enabled)
+        {
+            mean_vel_file_path = vm["mean-vel-file"].as<std::string>();
+            if(mean_vel_file_path.empty())
+                mean_vel_file_path = out_dir_name + "mean_vel.txt";
+            const string path_str = boost::filesystem::path(mean_vel_file_path).parent_path().string();
+            if(!path_str.empty())
+                boost::filesystem::create_directories(path_str);
+        }
+
+        //std::cout << "r_file_path: " << r_file_path << std::endl;
+        //std::cout << "mean_file_path: " << mean_file_path << std::endl;
+        //std::cout << "mean_vel_file_path: " << mean_vel_file_path << std::endl;
+
+#define RUN_SIMUL(coupling)                  \
+        run_simulation<fp_type, coupling>(   \
+            quiet,                           \
             N, N_steps, dt,                  \
             phase, freq, k, preset_name,     \
             noise,                           \
@@ -595,7 +629,9 @@ int main(int argc, char * argv[])
             k_freq,                          \
             k_offset,                        \
             out_dir_name,                    \
-            r_file_path                      \
+            r_file_path,                     \
+            mean_file_path,                  \
+            mean_vel_file_path               \
         )
 
         if(coupling_type == "kuramoto")

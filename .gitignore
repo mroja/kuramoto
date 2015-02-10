@@ -1,4 +1,9 @@
 
+forcing*.png
+forcing*.preset
+dump_forcing_*
+
+
 *.*~
 *.pyc
 kuramoto_simulation
