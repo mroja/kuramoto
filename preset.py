@@ -10,7 +10,9 @@ import math
 import json
 import struct
 import numpy as np
-from common import DataPreset, write_preset_to_file
+import matplotlib.pyplot as plt
+
+from common import DataPreset, write_preset_to_file, save_plot
 
 # Available presets:
 # * simple_freq
@@ -222,6 +224,34 @@ def get_preset(config, g_dtype=np.float64):
 
     return DataPreset(N, k, omega, phase)
 
+
+def plot_preset(preset_name, preset, save=False, close=True):
+    plt.figure()
+    plt.suptitle('Preset: {} (N = {})'.format(preset_name, preset.N))
+   
+    plt.subplot(2, 1, 1)
+    plt.ylabel('Phase histogram')
+    phase_range = (0, 2.0 * math.pi)
+    plt.xlim(phase_range[0], phase_range[1])
+    plt.hist(preset.phase, bins=50, range=phase_range)
+
+    plt.subplot(2, 1, 2)
+    plt.ylabel('Frequency histogram')
+    range = (np.percentile(preset.freq, 5), np.percentile(preset.freq, 95))
+    d = range[1] - range[0]
+    range = (range[0] - 0.15*d, range[1] + 0.15*d)
+    plt.xlim(range[0], range[1])
+    plt.hist(preset.freq, bins=50, range=range)
+
+    if save:
+        save_plot(preset_name, close=False)
+    else:
+        plt.show()
+
+    if close:
+        plt.close()
+
+
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
         print "Usage: gen_preset.py preset_name|config_file [K]"
@@ -238,31 +268,14 @@ if __name__ == '__main__':
             config['K'] = float(sys.argv[2])
         preset = get_preset(config)
 
-    preset_out_file_name = preset_name + '.preset'
-    try:
-        os.remove(preset_out_file_name)
-    except Exception:
-        pass
-
     #print preset.k
     #print preset.freq
     #print preset.phase
+    
     write_preset_to_file(preset_name, preset)
-    
-    if len(sys.argv) < 3:
-        import matplotlib.pyplot as plt
-        from common import save_plot    
-    
-        plt.ylabel('Phase histogram')
-        range = (0, 2.0 * math.pi)
-        plt.hist(preset.phase, bins=50, range=range)
-        plt.xlim(range[0], range[1])
-        save_plot(preset_name + '.phase')
 
-        plt.ylabel('Frequency histogram')
-        range = (np.percentile(preset.freq, 5), np.percentile(preset.freq, 95))
-        d = range[1] - range[0]
-        range = (range[0]-0.15*d, range[1]+0.15*d)
-        plt.hist(preset.freq, bins=50, range=range)
-        plt.xlim(range[0], range[1])
-        save_plot(preset_name + '.freq')
+    # save to file    
+    plot_preset(preset_name, preset, save=True)
+
+    # show plots
+    plot_preset(preset_name, preset, save=False)

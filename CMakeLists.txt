@@ -12,8 +12,7 @@ set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 
-find_package(Boost COMPONENTS thread filesystem system REQUIRED)
+find_package(Boost COMPONENTS thread filesystem system program_options REQUIRED)
 
 add_executable(kuramoto_simulation kuramoto_simulation.cpp)
 target_link_libraries(kuramoto_simulation ${Boost_LIBRARIES})
-

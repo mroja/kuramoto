@@ -46,6 +46,7 @@ static const fp_type TWO_PI = 2.0 * M_PI;
 #include <cstdlib>
 
 #include <boost/filesystem.hpp>
+#include <boost/program_options.hpp>
 
 #if defined(WIN32) || defined(_WIN32)
 #define PATH_SEPARATOR "\\"
@@ -423,197 +424,222 @@ void read_k_modulation_data(std::ifstream & input,
 int main(int argc, char * argv[])
 {
     using namespace std;
-
+    
     ios_base::sync_with_stdio(false);
-
-    if(argc <= 1)
+    
+    try
     {
-        cout << "Usage: kuramoto_simulation preset_name [--only-r] [-r r_file_path]" << endl;
+        namespace po = boost::program_options; 
+        po::options_description desc("Options"); 
+        desc.add_options() 
+            ("help,h", "print help message")
+            ("preset,p", po::value<std::string>()->required(), "preset name") 
+            ("steps,s", po::value<unsigned int>()->default_value(1000), "simulation steps") 
+            ("dump-interval,di", po::value<unsigned int>()->default_value(100), "data dump interval") 
+            ("dt", po::value<double>()->default_value(0.01), "simulation time step")
+            ("noise", po::value<double>()->default_value(0.0), "noise level")
+            ("coupling,c", po::value<std::string>()->default_value("kuramoto"), "coupling type")
+            ("forcing-strength,fs", po::value<double>()->default_value(0.0), "forcing strength")
+            ("forcing-freq,ff", po::value<double>()->default_value(0.0), "forcing frequency")
+            ("only-r", "generate only r file")
+            ("r-file,r", po::value<std::string>()->default_value("r.txt"), "r file path")
+            ("enable-k-modulation", "enable coupling coefficient modulation")
+            ("enable-freq-modulation", "enable frequency modulation");
+
+        po::variables_map vm; 
+        
+        try 
+        {
+            po::store(po::parse_command_line(argc, argv, desc), vm);
+            
+            if(vm.count("help"))
+            { 
+                std::cout << std::endl 
+                          << "kuramoto_simulation - versatile Kuramoto simulation program" << std::endl
+                          << std::endl 
+                          << desc << std::endl; 
+                return EXIT_SUCCESS;
+            }
+        }
+        catch(const po::error & e)
+        {
+            std::cerr << "ERROR: " << e.what() << std::endl << std::endl; 
+            std::cerr << desc << std::endl; 
+            return EXIT_FAILURE; 
+        } 
+
+        if(!vm.count("preset"))
+        {
+            std::cerr << "Preset name is required!" << std::endl
+                      << "Hint: use -h option to display help." << std::endl; 
+            return EXIT_FAILURE;
+        }
+
+        const string preset_name = vm["preset"].as<std::string>();
+        
+        const unsigned int N_steps = vm["steps"].as<unsigned int>();
+        unsigned int dump_interval = vm["dump-interval"].as<unsigned int>();
+        const fp_type dt = vm["dt"].as<double>();
+        const string coupling_type = vm["coupling"].as<std::string>();
+
+        const fp_type noise = vm["noise"].as<double>();
+        
+        const fp_type forcing_strength = vm["forcing-strength"].as<double>();
+        const fp_type forcing_freq = vm["forcing-freq"].as<double>();
+
+        const bool freq_modulation_enabled = vm.count("enable-freq-modulation");
+        const bool k_modulation_enabled = vm.count("enable-k-modulation");
+
+        unsigned int N;
+        vector<fp_type> freq;
+        vector<fp_type> phase;
+        vector<fp_type> k;
+
+        // read preset data
+        {
+            ifstream input(preset_name + ".preset", ifstream::in | ifstream::binary);
+
+            if(!input)
+            {
+                cerr << "Unable to open input file: " << preset_name << ".preset" << endl;
+                return EXIT_FAILURE;
+            }
+
+            input.exceptions(ifstream::failbit | ifstream::badbit);
+
+            read_preset(input, N, freq, phase, k);
+        }
+
+        vector<fp_type> freq_ampl;
+        vector<fp_type> freq_freq;
+        vector<fp_type> freq_offset;
+
+        vector<fp_type> k_ampl;
+        vector<fp_type> k_freq;
+        vector<fp_type> k_offset;
+
+        if(freq_modulation_enabled)
+        {
+            cout << "freq_modulation_enabled" << endl;
+            ifstream input_s(preset_name + ".fm.preset", ifstream::in | ifstream::binary);
+            if (!input_s)
+            {
+                cerr << "Unable to open frequency modulation data file: " << preset_name << ".fm.preset" << endl;
+                return EXIT_FAILURE;
+            }
+            input_s.exceptions(ifstream::failbit | ifstream::badbit);
+            read_freq_modulation_data(input_s, N, freq_ampl, freq_freq, freq_offset);
+        }
+
+        if(k_modulation_enabled)
+        {
+            cout << "k_modulation_enabled" << endl;
+            ifstream input_s(preset_name + ".km.preset", ifstream::in | ifstream::binary);
+            if (!input_s)
+            {
+                cerr << "Unable to open k modulation data file: " << preset_name << ".km.preset" << endl;
+                return EXIT_FAILURE;
+            }
+            input_s.exceptions(ifstream::failbit | ifstream::badbit);
+            read_k_modulation_data(input_s, N, k_ampl, k_freq, k_offset);
+        }
+
+        std::cout << "Data loaded." << std::endl;
+
+        bool r_history_enabled = true;
+        bool mean_history_enabled = true;
+        bool mean_vel_history_enabled = true;
+
+        string r_file_path; // = "r.txt";
+        string out_dir_name;
+
+        if (vm.count("only-r"))
+        {
+            dump_interval = 0; // no dumps
+            mean_history_enabled = false;
+            mean_vel_history_enabled = false;
+            r_file_path = vm["r-file"].as<std::string>();
+        }
+
+        if (dump_interval > 0)
+        {
+            out_dir_name = "dump_" + preset_name + PATH_SEPARATOR + "steps" + PATH_SEPARATOR;
+            // std::cout << "Creating steps dir: " << out_dir_name << std::endl;
+            boost::filesystem::create_directories(out_dir_name);
+        }
+
+        if (!r_file_path.empty())
+        {
+            const string path_str = boost::filesystem::path(r_file_path).parent_path().string();
+            // std::cout << "Creating r-file dir: " << path_str << std::endl;
+            if(path_str != "")
+                boost::filesystem::create_directories(path_str);
+        }
+
+#define RUN_SIMUL(copuling)                  \
+        run_simulation<fp_type, copuling>(   \
+            N, N_steps, dt,                  \
+            phase, freq, k, preset_name,     \
+            noise,                           \
+            forcing_strength, forcing_freq,  \
+            dump_interval,                   \
+            r_history_enabled,               \
+            mean_history_enabled,            \
+            mean_vel_history_enabled,        \
+            freq_modulation_enabled,         \
+            freq_ampl,                       \
+            freq_freq,                       \
+            freq_offset,                     \
+            k_modulation_enabled,            \
+            k_ampl,                          \
+            k_freq,                          \
+            k_offset,                        \
+            out_dir_name,                    \
+            r_file_path                      \
+        )
+
+        if(coupling_type == "kuramoto")
+            RUN_SIMUL(kuramoto_classic);
+        else if(coupling_type == "kuramoto_2")
+            RUN_SIMUL(kuramoto_n<2>);
+    	else if(coupling_type == "kuramoto_3")
+    		RUN_SIMUL(kuramoto_n<3>);
+    	else if(coupling_type == "kuramoto_4")
+    		RUN_SIMUL(kuramoto_n<4>);
+    	else if(coupling_type == "kuramoto_5")
+    		RUN_SIMUL(kuramoto_n<5>);
+    	else if(coupling_type == "kuramoto_6")
+    		RUN_SIMUL(kuramoto_n<6>);
+    	else if(coupling_type == "kuramoto_7")
+    		RUN_SIMUL(kuramoto_n<7>);
+    	else if(coupling_type == "kuramoto_8")
+    		RUN_SIMUL(kuramoto_n<8>);
+    	else if(coupling_type == "kuramoto_9")
+    		RUN_SIMUL(kuramoto_n<9>);
+    	else if(coupling_type == "kuramoto_10")
+    		RUN_SIMUL(kuramoto_n<10>);
+    	else if(coupling_type == "daido")
+            RUN_SIMUL(daido_original);
+        else if(coupling_type == "coupling_1")
+            RUN_SIMUL(coupling_1);
+        else if(coupling_type == "coupling_2")
+            RUN_SIMUL(coupling_2);
+        else if(coupling_type == "coupling_3")
+            RUN_SIMUL(coupling_3);
+        else if(coupling_type == "coupling_4")
+            RUN_SIMUL(coupling_4);
+        else
+        {
+            std::cerr << "Unknown coupling type: " << coupling_type << std::endl;
+            return EXIT_FAILURE;
+        }
+    }
+    catch(std::exception& e) 
+    { 
+        std::cerr << "Unhandled Exception reached the top of main: " 
+                  << e.what() << ", application will now exit." << std::endl; 
         return EXIT_FAILURE;
-    }
-
-    const string preset_name(argv[1]);
-
-    unsigned int N_steps;
-    fp_type dt;
-    fp_type noise;
-    unsigned int dump_interval;
-    string coupling_type;
-    fp_type forcing_strength;
-    fp_type forcing_freq;
-
-    string freq_modulation_enabled_s;
-    string k_modulation_enabled_s;
-
-    // read .conf.txt
-    {
-        ifstream cfg_input(preset_name + ".conf.txt");
-        if(!cfg_input)
-        {
-            cerr << "Unable to open config file: " << preset_name << ".conf.txt" << endl;
-            return EXIT_FAILURE;
-        }
-        cfg_input.exceptions(ifstream::failbit | ifstream::badbit);
-
-        cfg_input >> N_steps;
-        cfg_input >> dt;
-        cfg_input >> noise;
-        cfg_input >> dump_interval;
-        cfg_input >> coupling_type;
-        cfg_input >> forcing_strength;
-        cfg_input >> forcing_freq;
-        cfg_input >> freq_modulation_enabled_s;
-        cfg_input >> k_modulation_enabled_s;
-    }
-
-    const bool freq_modulation_enabled = (freq_modulation_enabled_s == "freq_modulation");
-    const bool k_modulation_enabled = (k_modulation_enabled_s == "k_modulation");
-
-    unsigned int N;
-    vector<fp_type> freq;
-    vector<fp_type> phase;
-    vector<fp_type> k;
-
-    // read preset data
-    {
-        ifstream input(preset_name + ".preset", ifstream::in | ifstream::binary);
-
-        if(!input)
-        {
-            cerr << "Unable to open input file: " << preset_name << ".preset" << endl;
-            return EXIT_FAILURE;
-        }
-
-        input.exceptions(ifstream::failbit | ifstream::badbit);
-
-        read_preset(input, N, freq, phase, k);
-    }
-
-    vector<fp_type> freq_ampl;
-    vector<fp_type> freq_freq;
-    vector<fp_type> freq_offset;
-
-    vector<fp_type> k_ampl;
-    vector<fp_type> k_freq;
-    vector<fp_type> k_offset;
-
-    if(freq_modulation_enabled)
-    {
-        cout << "freq_modulation_enabled" << endl;
-        ifstream input_s(preset_name + ".fm.preset", ifstream::in | ifstream::binary);
-        if (!input_s)
-        {
-            cerr << "Unable to open frequency modulation data file: " << preset_name << ".fm.preset" << endl;
-            return EXIT_FAILURE;
-        }
-        input_s.exceptions(ifstream::failbit | ifstream::badbit);
-        read_freq_modulation_data(input_s, N, freq_ampl, freq_freq, freq_offset);
-    }
-
-    if(k_modulation_enabled)
-    {
-        cout << "k_modulation_enabled" << endl;
-        ifstream input_s(preset_name + ".km.preset", ifstream::in | ifstream::binary);
-        if (!input_s)
-        {
-            cerr << "Unable to open k modulation data file: " << preset_name << ".km.preset" << endl;
-            return EXIT_FAILURE;
-        }
-        input_s.exceptions(ifstream::failbit | ifstream::badbit);
-        read_k_modulation_data(input_s, N, k_ampl, k_freq, k_offset);
-    }
-
-    std::cout << "Data loaded." << std::endl;
-
-    bool r_history_enabled = true;
-    bool mean_history_enabled = true;
-    bool mean_vel_history_enabled = true;
-
-    string r_file_path = "r.txt";
-    string out_dir_name;
-
-    if (argc >= 3 && string(argv[2]) == "--only-r")
-    {
-        dump_interval = 0; // no dumps
-        mean_history_enabled = false;
-        mean_vel_history_enabled = false;
-
-        if (argc >= 5 && string(argv[3]) == "-r")
-            r_file_path = argv[4];
-    }
-
-    if (dump_interval > 0)
-    {
-        out_dir_name = "dump_" + preset_name + PATH_SEPARATOR + "steps" + PATH_SEPARATOR;
-        // std::cout << "Creating steps dir: " << out_dir_name << std::endl;
-        boost::filesystem::create_directories(out_dir_name);
-    }
-
-    if (!r_file_path.empty())
-    {
-        const string path_str = boost::filesystem::path(r_file_path).parent_path().string();
-        // std::cout << "Creating r-file dir: " << path_str << std::endl;
-        if(path_str != "")
-            boost::filesystem::create_directories(path_str);
-    }
-
-#define RUN_SIMUL(copuling)              \
-    run_simulation<fp_type, copuling>(   \
-        N, N_steps, dt,                  \
-        phase, freq, k, preset_name,     \
-        noise,                           \
-        forcing_strength, forcing_freq,  \
-        dump_interval,                   \
-        r_history_enabled,               \
-        mean_history_enabled,            \
-        mean_vel_history_enabled,        \
-        freq_modulation_enabled,         \
-        freq_ampl,                       \
-        freq_freq,                       \
-        freq_offset,                     \
-        k_modulation_enabled,            \
-        k_ampl,                          \
-        k_freq,                          \
-        k_offset,                        \
-        out_dir_name,                    \
-        r_file_path                      \
-    )
-
-    if(coupling_type == "kuramoto")
-        RUN_SIMUL(kuramoto_classic);
-    else if(coupling_type == "kuramoto_2")
-        RUN_SIMUL(kuramoto_n<2>);
-	else if(coupling_type == "kuramoto_3")
-		RUN_SIMUL(kuramoto_n<3>);
-	else if(coupling_type == "kuramoto_4")
-		RUN_SIMUL(kuramoto_n<4>);
-	else if(coupling_type == "kuramoto_5")
-		RUN_SIMUL(kuramoto_n<5>);
-	else if(coupling_type == "kuramoto_6")
-		RUN_SIMUL(kuramoto_n<6>);
-	else if(coupling_type == "kuramoto_7")
-		RUN_SIMUL(kuramoto_n<7>);
-	else if(coupling_type == "kuramoto_8")
-		RUN_SIMUL(kuramoto_n<8>);
-	else if(coupling_type == "kuramoto_9")
-		RUN_SIMUL(kuramoto_n<9>);
-	else if(coupling_type == "kuramoto_10")
-		RUN_SIMUL(kuramoto_n<10>);
-	else if(coupling_type == "daido")
-        RUN_SIMUL(daido_original);
-    else if(coupling_type == "coupling_1")
-        RUN_SIMUL(coupling_1);
-    else if(coupling_type == "coupling_2")
-        RUN_SIMUL(coupling_2);
-    else if(coupling_type == "coupling_3")
-        RUN_SIMUL(coupling_3);
-    else if(coupling_type == "coupling_4")
-        RUN_SIMUL(coupling_4);
-    else
-    {
-        std::cerr << "Unknown coupling type: " << coupling_type << std::endl;
-        return EXIT_FAILURE;
-    }
+    } 
 
     return EXIT_SUCCESS;
 }

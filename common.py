@@ -4,6 +4,7 @@
 import os
 import struct
 import numpy as np
+import subprocess
 import matplotlib.pyplot as plt
 from collections import namedtuple
 
@@ -13,7 +14,8 @@ from collections import namedtuple
 # k     - coupling coefficients (NxN matrix)
 DataPreset = namedtuple('DataPreset', ['N', 'k', 'freq', 'phase'])
 
-class SimulationConfig(object):
+
+class KuramotoSimulation(object):
     def __init__(self):
         self.N_steps = 0
         self.dt = 0.01
@@ -25,6 +27,34 @@ class SimulationConfig(object):
         self.freq_modulation_enabled = False
         self.k_modulation_enabled = False
 
+    def run(self, preset_name, r_only=False, r_file='r.txt'):
+        cmd = ['kuramoto_simulation',
+               '--preset', preset_name,
+               '--steps', str(self.N_steps),
+               '--dump-interval', str(self.dump_interval),
+               '--dt', str(self.dt),
+               '--noise', str(self.noise),
+               '--coupling', self.coupling_type,
+               '--forcing-strength', str(self.forcing_strength), 
+               '--forcing-freq', str(self.forcing_freq)]
+
+        if r_only:
+            cmd.append('--only-r')
+            cmd.append('--r-file')
+            cmd.append(r_file)
+
+        if self.k_modulation_enabled:
+            cmd.append('--enable-k-modulation')
+
+        if self.freq_modulation_enabled:
+            cmd.append('--enable-freq-modulation')
+
+        # print cmd
+
+        subprocess.call(cmd)
+
+
+    '''
     def write_to_file(self, preset_name):
         conf_str = \
             '{N_steps:d}\n' + \
@@ -63,6 +93,8 @@ class SimulationConfig(object):
             self.forcing_freq = float(lines[6])
             self.freq_modulation_enabled = True if lines[7] == 'freq_modulation' else False
             self.k_modulation_enabled = True if lines[11] == 'k_modulation' else False
+    '''
+
 
 def load_preset_from_file(name):
     with open(name + '.preset', 'rb') as f:
@@ -72,12 +104,21 @@ def load_preset_from_file(name):
         k = np.fromfile(f, dtype=np.float64, count=N*N)
     return DataPreset(N, k, freq, phase)
 
-def write_preset_to_file(file_name, preset):
-    with open(file_name + '.preset', 'wb') as f:
+
+def write_preset_to_file(preset_name, preset):
+    preset_file_name = preset_name + '.preset'
+    
+    try:
+        os.remove(preset_file_name)
+    except Exception:
+        pass    
+    
+    with open(preset_file_name, 'wb') as f:
         f.write(struct.pack('I', preset.N))
         preset.freq.astype(np.float64).tofile(f)
         preset.phase.astype(np.float64).tofile(f)
         preset.k.astype(np.float64).tofile(f)
+
 
 def write_freq_modul_data_to_file(file_name, freq_ampl, freq_freq, freq_offset):
     with open(file_name + '.fm.preset', 'wb') as f:
@@ -85,11 +126,13 @@ def write_freq_modul_data_to_file(file_name, freq_ampl, freq_freq, freq_offset):
         freq_freq.astype(np.float64).tofile(f)
         freq_offset.astype(np.float64).tofile(f)
 
+
 def write_k_modul_data_to_file(file_name, k_ampl, k_freq, k_offset):
     with open(file_name + '.km.preset', 'wb') as f:
         k_ampl.astype(np.float64).tofile(f)
         k_freq.astype(np.float64).tofile(f)
         k_offset.astype(np.float64).tofile(f)
+
 
 def save_plot(path, ext='png', close=True):
     directory = os.path.split(path)[0]
