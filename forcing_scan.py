@@ -103,7 +103,7 @@ if __name__ == '__main__':
         plot_crit_k(preset_name, K_values, r_mean, save=False)
         sys.exit()
     else:
-        preset_config['K'] = 11.5
+        preset_config['K'] = 15.5
 
     forcing_presets = []
     for forcing_strength in range(0, 20, 4):
@@ -127,7 +127,7 @@ if __name__ == '__main__':
         pool.map(run_simulation, args)
         pool.close()
 
-    # visulize
+    # visualize
     if 1:
         for forcing_frequency, forcing_strength in forcing_presets:
             preset_name = 'forcing_{}_{}'.format(forcing_frequency, forcing_strength)
